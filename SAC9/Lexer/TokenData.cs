@@ -5,7 +5,7 @@ public enum TokenType {
   Number,
   AddOp,
   MulOp,
-  LogOP,
+  LogOp,
   OpenPar,
   ClosePar,
   OpenBrace,
