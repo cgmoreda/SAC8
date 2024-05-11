@@ -22,6 +22,7 @@ public enum TokenType {
   real_,
   num_,
   equal_,
+  invalid
 }
 
 public record Lexeme {
