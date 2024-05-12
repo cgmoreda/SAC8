@@ -19,7 +19,7 @@ namespace SAC9.Parser
     public record NoTermReturn
     {
         public int rightIndex { get; set; }
-        public int errorID;
+        public string error;
         public Node? node { get; set; }
     }
 }
