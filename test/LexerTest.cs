@@ -1,5 +1,6 @@
 using SAC9.Lexer;
 
+namespace test;
 // create a test
 public class LexerTest
 {
