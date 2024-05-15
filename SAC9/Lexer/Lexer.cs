@@ -8,6 +8,7 @@ namespace SAC9.Lexer
 
         public static List<Lexeme> scan(string input)
         {
+            input += ' ';
             int countLine = 0;
             int countColumn = 0;
             List<Lexeme> result = new List<Lexeme>();

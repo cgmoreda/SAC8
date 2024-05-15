@@ -2,7 +2,6 @@
 using SAC9.Parser;
 using Newtonsoft.Json;
 
-Console.WriteLine("Hello, World!");
 string input = @"صحيح وو () {
 صحيح   نمتك;
 }";

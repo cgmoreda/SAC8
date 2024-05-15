@@ -6,8 +6,8 @@ public record Node {
   public List<Node> Childs { get; } = new List<Node>();
 }
 
-public record NoTermReturn {
-  public int rightIndex { get; set; }
-  public string error = "";
+public record Result {
+  public int last { get; set; }
+  public string error { get; set; } = string.Empty; 
   public Node ? node { get; set; } = new Node();
 }
