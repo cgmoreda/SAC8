@@ -6,7 +6,7 @@ public record Node {
 
   public string Type { get; set; } = string.Empty;
 
-  public List<Node> Childs { get; } = new List<Node>();
+  public List<Node> Children { get; } = new List<Node>();
 }
 
 public record Result {

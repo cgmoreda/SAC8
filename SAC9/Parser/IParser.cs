@@ -59,4 +59,7 @@ public interface IParserServices {
   public static abstract bool addOp(Lexeme lexeme);
   public static abstract bool mulOp(Lexeme lexeme);
   public static abstract bool relOp(Lexeme lexeme);
+
+  public static abstract Node CreateNode(string type, int left, int right,
+                                         params Node[] childrens);
 }
