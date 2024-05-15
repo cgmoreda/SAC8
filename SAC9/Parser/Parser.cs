@@ -43,7 +43,7 @@ public static class Parser {
     NoTermReturn varRes = VarDeclaration(left);
     if (varRes != null) {
       NoTermReturn ret = new NoTermReturn();
-      ret.node.Childs.Add(ret.node);
+      ret.node.Childs.Add(varRes.node);
       ret.node.Type = "Declaration";
       ret.rightIndex = varRes.rightIndex;
       return ret;
@@ -138,6 +138,7 @@ public static class Parser {
                 error =
                     $"Expected ']' at line {lexemes[left + 4].line} at column: {lexemes[left + 4].column}\n",
                 rightIndex = left + 5,
+                
                 node = _node,
               };
             }
