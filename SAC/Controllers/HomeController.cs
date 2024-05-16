@@ -23,6 +23,10 @@ namespace SAC.Controllers
         public IActionResult Source(string source )
         {
             tk tk_ = new tk();
+             if (tk_.tree(source).Trim().Length==0)
+            {
+                return Ok(new { tree = "???", lex = tk_.lex(source) });
+            }
             return Ok(new { tree =  tk_.tree(source), lex = tk_.lex(source) });
             
         }

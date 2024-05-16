@@ -78,7 +78,7 @@
                             <div class="d-flex align-items-center justify-content-between mb-4">
                                 <h6 class="mb-0">Source Code</h6>
                             </div>
-                            <textarea id="sourcecode" class="form-control form-control-lg w-100" rows="11" placeholder="Enter your text here..." dir="rtl"></textarea>
+                            <textarea  id="sourcecode" class="form-control form-control-lg w-100" rows="11" placeholder="Enter your text here..." dir="rtl"></textarea>
                         </div>
                     </div>
                     <div class="col-sm-12 col-xl-3">
@@ -87,7 +87,7 @@
                                 <h6 class="mb-0">Output</h6>
 
                             </div>
-                            <textarea id="output" class="form-control form-control-lg w-100" rows="11"></textarea>
+                            <textarea style="background-color:black" id="output" class="form-control form-control-lg w-100" rows="11" readonly></textarea>
 
                         </div>
                     </div>
@@ -101,7 +101,7 @@
                         <h6 class="mb-0">Error List</h6>
 
                     </div>
-                    <textarea id="error" class="form-control form-control-lg w-100" rows="4"></textarea>
+                    <textarea style="background-color:black" id="error" class="form-control form-control-lg w-100" rows="4" readonly></textarea>
 
                 </div>
             </div>
@@ -145,7 +145,9 @@
                         document.getElementById("error").value = '';
                         document.getElementById("error").value = JSON.stringify(res.tree);
                         document.getElementById("output").value = '';
+
                         document.getElementById("output").value = JSON.stringify(res.lex);
+       
                     },
 
                     error: function (res) {
