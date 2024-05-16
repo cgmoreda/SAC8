@@ -27,6 +27,10 @@ namespace SAC9
             return res.ToList();
 
         }
+        
+        public static void main(string[] args)
+        {
 
+        }
     }
 }

@@ -7,7 +7,12 @@ public class Parser : IParser {
 
   public Parser(List<Lexeme> lexemes) => this.lexemes = lexemes;
 
-  public Result Parse() { return DeclarationList(0, lexemes.Count); }
+  public Result Parse() { 
+        if(lexemes.Count == 0)
+            return ParserServices.CreateResult(-1, "جدع",new Node
+            { });
+            
+                return DeclarationList(0, lexemes.Count); }
 
   public Result DeclarationList(int start, int end) {
     if (start > end)
@@ -69,7 +74,7 @@ public class Parser : IParser {
       }
       return ParserServices.CreateResult(
           -1,
-          $"incorrect Declaration at line: {lexemes[i].line} col: {lexemes[i].column}");
+          $"incorrect Declaration at line: {lexemes[i-1].line} col: {lexemes[i-1].column}");
     } else {
       if (ParserServices.TypeSpecifier(lexemes[i++]) &&
           lexemes[i++].type == TokenType.Ident &&
