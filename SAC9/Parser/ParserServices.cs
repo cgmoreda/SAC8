@@ -4,7 +4,7 @@ namespace SAC9.Parser;
 
 public class ParserServices : IParserServices {
   public static bool TypeSpecifier(Lexeme lexeme) {
-    return lexeme.type == TokenType.real_ || lexeme.type == TokenType.num_;
+    return lexeme.type == TokenType.real_ || lexeme.type == TokenType.num_ || lexeme.type == TokenType.Void_;
   }
 
   public static bool addOp(Lexeme lexeme) {
@@ -41,10 +41,22 @@ public class ParserServices : IParserServices {
 public static class Enders {
   public static int CompoundStatementClose(int i, List<Lexeme> lex, int end) {
     int cnt = 1;
-    for (; i <= end; i++) {
+    for (; i < end; i++) {
       if (lex[i].type == TokenType.OpenBrace)
         cnt++;
       else if (lex[i].type == TokenType.CloseBrace)
+        cnt--;
+      if (cnt == 0)
+        return i;
+    }
+    return -1;
+  }
+  public static int BracetClose(int i, List<Lexeme> lex, int end) {
+    int cnt = 1;
+    for (; i < end; i++) {
+      if (lex[i].type == TokenType.OpenBracket)
+        cnt++;
+      else if (lex[i].type == TokenType.OpenBracket)
         cnt--;
       if (cnt == 0)
         return i;
