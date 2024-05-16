@@ -15,10 +15,6 @@ public interface IParser {
 
   public Result Params(int start, int end);
 
-  public Result ParamList(int start, int end);
-
-  public Result Param(int start, int end);
-
   public Result CompoundStmt(int start, int end);
 
   public Result LocalDeclarations(int start, int end);
@@ -62,4 +58,6 @@ public interface IParserServices {
 
   public static abstract Node CreateNode(string type, int left, int right,
                                          params Node[] childrens);
+  public static abstract Result CreateResult(int last, string error,
+                                             Node? node null);
 }

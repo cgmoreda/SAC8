@@ -28,7 +28,27 @@ public class ParserServices : IParserServices {
     }
     return node;
   }
-  public static Result CreateResult(int last, string error, Node? node = null){
-    return new Result {last = last, error = error, node = node};
+
+  public static Result CreateResult(int last, string error, Node? node = null) {
+    return new Result { last = last, error = error, node = node };
+  }
+  // TODO the interface 
+  public static Result CreateError(string error){
+    return new Result { last = -1, error = error};
+  }
+}
+
+public static class Enders {
+  public static int CompoundStatementClose(int i, List<Lexeme> lex, int end) {
+    int cnt = 1;
+    for (; i <= end; i++) {
+      if (lex[i].type == TokenType.OpenBrace)
+        cnt++;
+      else if (lex[i].type == TokenType.CloseBrace)
+        cnt--;
+      if (cnt == 0)
+        return i;
+    }
+    return -1;
   }
 }

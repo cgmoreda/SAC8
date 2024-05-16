@@ -82,13 +82,60 @@ public class Parser : IParser {
     }
   }
 
-  public Result FunDeclaration(int start, int end) {}
+  public Result FunDeclaration(int start, int end) {
+    int i = start;
+    // TODO: reda red write the example
+    if (start < end - 5)
+      return ParserServices.CreateResult(
+          -1, $"incomplete FunDeclaration {lexemes[start].line}");
 
-  public Result Params(int start, int end) {}
+    Result path1, path2;
+    var getNextPar = (int j) => {
+      while (j < end) {
+        j++;
+        if (lexemes[j].type == TokenType.ClosePar)
+          return j;
+      }
+      return -1;
+    };
+    int j, k;
+    if (ParserServices.TypeSpecifier(lexemes[i++]) &&
+        lexemes[i++].type == TokenType.Ident &&
+        lexemes[i++].type == TokenType.OpenPar && (j = getNextPar(i)) != -1) {
+      path1 = Params(i, j++);
+      if ((k = Enders.CompoundStatementClose(j + 1, lexemes, end)) == -1)
+        return ParserServices.CreateResult(
+            -1, $"expected {'}'} at line : {lexemes[end].line} ");
+      path2 = CompoundStmt(j, k);
+    } else
+      return ParserServices.CreateResult(
+          -1,
+          $"incomplete function Declaration at line: {lexemes[i].line} column: {lexemes[i].column}");
+  }
 
-  public Result ParamList(int start, int end) {}
-
-  public Result Param(int start, int end) {}
+  public Result Params(int start, int end) {
+    // TODO: Sherif
+    var node = ParserServices.CreateNode("paramList", start, end - 1);
+    for (; start < end; start++) {
+      if (ParserServices.TypeSpecifier(lexemes[start++]) &&
+          lexemes[start++].type == TokenType.Ident) {
+        if (lexemes[start].type == TokenType.Comma || start == end)
+          node.Children.Add(
+              ParserServices.CreateNode("param", start - 2, start));
+        else if (lexemes[start].type == TokenType.OpenBracket &&
+                 lexemes[++start].type == TokenType.CloseBracket &&
+                 (lexemes[start].type == TokenType.Comma || start == end)) {
+          node.Children.Add(
+              ParserServices.CreateNode("param", start - 4, start));
+        } else
+          return ParserServices.CreateError(
+              $"function paramers Incorrect at line: {lexemes[end].line}");
+      } else
+        return ParserServices.CreateError(
+            $"function paramers Incorrect at line: {lexemes[end].line}");
+    }
+    return ParserServices.CreateResult(end, "", node);
+  }
 
   public Result CompoundStmt(int start, int end) {}
 
