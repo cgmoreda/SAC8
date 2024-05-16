@@ -132,7 +132,7 @@ public class Parser : IParser
             path1 = Params(i, j++);
             if ((k = Enders.CompoundStatementClose(j + 1, lexemes, end)) == -1)
                 return ParserServices.CreateResult(
-                    -1, $"expected {'}'} at line : {lexemes[end].line} ");
+                    -1, $"expected {'}'} at line : {lexemes[end-1].line} ");
             path2 = CompoundStmt(j, k);
             return ParserServices.CreateResult(
                 k, path2.error,
@@ -176,25 +176,22 @@ public class Parser : IParser
 
     public Result CompoundStmt(int start, int end)
     {
+        // compoundStmt -> { localDeclarations statementList }
+        if (start > end - 2)
+            return ParserServices.CreateError("expected compound statement");
+        if (lexemes[start++].type != TokenType.OpenBrace)
+            return ParserServices.CreateError("expected {");
         var path1 = LocalDeclarations(start, end);
-        if (path1.last == -1)
-            return ParserServices.CreateResult(
-                -1, path1.error,
-                ParserServices.CreateNode("CompoundStmt", start, end));
+
         var path2 = StatementList(path1.last + 1, end);
         if (path2.last == -1)
-            return ParserServices.CreateResult(
-                -1, path2.error,
-                ParserServices.CreateNode("CompoundStmt", start, end));
-        if (path2.last+1==end)
-        {
+            return ParserServices.CreateError(path2.error);
+       
+        if (lexemes[path2.last+1].type != TokenType.CloseBrace)
+            return ParserServices.CreateError(
+                               $"expected {'}'} at line: {lexemes[path2.last].line}");
 
-            return ParserServices.CreateResult(
-                end, "",
-                ParserServices.CreateNode("CompoundStmt", start, end, path1.node,
-                                            path2.node));
-        }
-        return ParserServices.CreateError($"Component statment from start: {lexemes[start].line}to: {lexemes[end-1].line}");
+        return ParserServices.CreateResult(path2.last, "", ParserServices.CreateNode("CompoundStmt", start, path2.last + 1,path1.node, path2.node));
     }
 
     public Result LocalDeclarations(int start, int end)
@@ -206,7 +203,7 @@ public class Parser : IParser
         if (path1.last == -1)
         {
             return ParserServices.CreateResult(
-                start, path1.error, ParserServices.CreateNode("", start, start));
+                start-1, "", ParserServices.CreateNode("", start, start));
         }
         var path2 = DeclarationList(path1.last + 1, end);
         // if the second path is invalid return the valid `path`
@@ -236,7 +233,7 @@ public class Parser : IParser
         {
             return path1;
         }
-        if (path1.last + 1 == end)
+        if (path1.last + 1== end)
             return path1;
         var path2 = StatementList(path1.last + 1, end);
         // if the second path is invalid return the valid `path`
@@ -341,7 +338,7 @@ public class Parser : IParser
                 $"expected statement at line: {lexemes[path1.last + 1].line}");
         return ParserServices.CreateResult(
             path2.last, "",
-            ParserServices.CreateNode("IterationStmt", start, path2.last + 1,
+            ParserServices.CreateNode("IterationStmt", start, path2.last+1,
                                       path1.node, path2.node));
     }
 
