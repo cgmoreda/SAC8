@@ -59,7 +59,7 @@ namespace SAC9.Lexer
                     });
                     continue;
                 }
-                if (cur == ';')
+                if (cur == ';'||cur == '؛')
                 {
                     result.Add(new Lexeme()
                     {
@@ -69,7 +69,7 @@ namespace SAC9.Lexer
                         column = st
                     });
                 }
-                if (cur == ',')
+                if (cur == ','||cur == '،')
                 {
                     result.Add(new Lexeme()
                     {

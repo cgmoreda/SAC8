@@ -250,6 +250,8 @@ public class Parser : IParser
 
     public Result Statement(int start, int end)
     {
+        if(start==end-1)
+            return ParserServices.CreateResult(start,"warning: empty statement");
         if (start > end - 1)
             return ParserServices.CreateError("expected statement");
         if (lexemes[start].type == TokenType.OpenBrace)
@@ -258,7 +260,7 @@ public class Parser : IParser
             return SelectionStmt(start, end);
         if (lexemes[start].type == TokenType.while_)
             return IterationStmt(start, end);
-        if (lexemes[start].type == TokenType.return_)
+        if (lexemes[start].type == TokenType.return_) 
             return ReturnStmt(start, end);
         return ExpressionStmt(start, end);
     }
