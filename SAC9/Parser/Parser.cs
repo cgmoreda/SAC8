@@ -107,10 +107,11 @@ public class Parser : IParser {
         return ParserServices.CreateResult(
             -1, $"expected {'}'} at line : {lexemes[end].line} ");
       path2 = CompoundStmt(j, k);
-    } else
-      return ParserServices.CreateResult(
-          -1,
-          $"incomplete function Declaration at line: {lexemes[i].line} column: {lexemes[i].column}");
+      return ParserServices.CreateResult(k,path2.error,ParserServices.CreateNode("FunDeclaration",start,end,path1.node,path2.node));
+    } 
+    return ParserServices.CreateResult(
+        -1,
+        $"incomplete function Declaration at line: {lexemes[i].line} column: {lexemes[i].column}");
   }
 
   public Result Params(int start, int end) {
@@ -137,7 +138,21 @@ public class Parser : IParser {
     return ParserServices.CreateResult(end, "", node);
   }
 
-  public Result CompoundStmt(int start, int end) {}
+  public Result CompoundStmt(int start, int end) {
+    var res = new Result();
+    var path1 = LocalDeclarations(start, end);
+    if (path1.last == -1)
+      return ParserServices.CreateResult(
+          -1, path1.error,
+          ParserServices.CreateNode("CompoundStmt", start, end));
+    var path2 = StatementList(path1.last + 1, end);
+    if (path2.last == -1) {
+      if (path2.last == -1)
+        return ParserServices.CreateResult(
+            -1, path2.error,
+            ParserServices.CreateNode("CompoundStmt", start, end));
+    }
+  }
 
   public Result LocalDeclarations(int start, int end) {}
 

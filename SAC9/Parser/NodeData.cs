@@ -10,6 +10,7 @@ public record Node {
 }
 
 public record Result {
+  // -1 if error 
   public int last { get; set; }
 
   public string error { get; set; } = string.Empty;
