@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using SAC.Models;
 using System.Diagnostics;
 using SAC9;
-using Microsoft.AspNetCore.Routing.Tree;
 
 namespace SAC.Controllers
 {
@@ -24,7 +23,7 @@ namespace SAC.Controllers
         public IActionResult Source(string source )
         {
             tk tk_ = new tk();
-            return Ok(new { tree =  tk_.tree(source)});
+            return Ok(new { tree =  tk_.tree(source), lex = tk_.lex(source) });
             
         }
 
