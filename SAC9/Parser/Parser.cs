@@ -30,7 +30,7 @@ public class Parser : IParser {
     // bolierplate code to create a new node
     Node node = ParserServices.CreateNode(
         "DeclarationList", start, path2.last + 1, path1.node, path2.node);
-    Result result = ParserServices.CreateResult(path2.last, "", node);
+    Result result = ParserServices.CreateResult(path2.last, path2.error, node);
     return result;
   }
 
@@ -38,7 +38,7 @@ public class Parser : IParser {
     var path1 = VarDeclaration(start, end);
     var path2 = FunDeclaration(start, end);
     if (path1.last == -1 && path2.last == -1) {
-      return new Result { last = -1, error = "" + path1.error + path2.error };
+      return new Result { last = -1, error = "" + path1.error +" or "+ path2.error };
     }
     var result =
         new Result { node = new Node { Type = "Declaration", left = start } };
@@ -61,8 +61,8 @@ public class Parser : IParser {
     int i = start;
     if (start > end - 3)
       return ParserServices.CreateResult(
-          -1, $"incomplete Declaration at line:{lexemes[i].line}");
-    if (start > end - 5 && lexemes[start + 2].type == TokenType.OpenBracket) {
+          -1, $"incomplete VarDeclaration at line:{lexemes[i].line}");
+    if (start < end - 5 && lexemes[start + 2].type == TokenType.OpenBracket) {
       if (ParserServices.TypeSpecifier(lexemes[i++]) &&
           lexemes[i++].type == TokenType.Ident &&
           lexemes[i++].type == TokenType.OpenBracket &&
@@ -74,7 +74,7 @@ public class Parser : IParser {
       }
       return ParserServices.CreateResult(
           -1,
-          $"incorrect Declaration at line: {lexemes[i-1].line} col: {lexemes[i-1].column}");
+          $"incorrect VarDeclaration at line: {lexemes[i-1].line} col: {lexemes[i-1].column}");
     } else {
       if (ParserServices.TypeSpecifier(lexemes[i++]) &&
           lexemes[i++].type == TokenType.Ident &&
@@ -84,7 +84,7 @@ public class Parser : IParser {
       }
       return ParserServices.CreateResult(
           -1,
-          $"incorrect Declaration at line: {lexemes[i].line} col: {lexemes[i].column}");
+          $"incorrect VarDeclaration at line: {lexemes[i].line} col: {lexemes[i].column}");
     }
   }
 
