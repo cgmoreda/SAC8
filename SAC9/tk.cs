@@ -14,7 +14,7 @@ namespace SAC9
            
             Parser.Parser parser = new Parser.Parser(Lexer.Lexer.scan(source));
             var res= parser.Parse();
-            Console.WriteLine(res.error);
+            Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(res));
             return res.error;
 
         }
