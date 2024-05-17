@@ -1,1300 +1,609 @@
-﻿using System.Data.Common;
-using System.Xml.Linq;
-using SAC9.Lexer;
+﻿using SAC9.Lexer;
 
-namespace SAC9.Parser {
-public static class Parser {
-  public static List<Lexeme> lexemes { get; set; } = new List<Lexeme>();
+namespace SAC9.Parser;
 
-  // Program
-  static public NoTermReturn Parse() { return DeclarationList(0); }
+public class Parser : IParser
+{
+    public List<Lexeme> lexemes;
 
-  public static NoTermReturn DeclarationList(int leftIndex) {
-    if (leftIndex >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = leftIndex, node = null };
-    }
-    Node root = new Node() {};
-    NoTermReturn ntrm = Declaration(leftIndex);
-    Node? path1 = ntrm.node;
+    public Parser(List<Lexeme> lexemes) => this.lexemes = lexemes;
 
-    if (ntrm.rightIndex != -1) {
-      if (path1 != null)
-        root.Childs.Add(path1);
-      NoTermReturn dls = DeclarationList(ntrm.rightIndex);
-      if (dls.node != null) {
-        root.Childs.Add(dls.node);
-        return new NoTermReturn() { rightIndex = dls.rightIndex, node = root,
-                                    error = dls.error };
-      } else {
-        return ntrm;
-      }
+    public Result Parse()
+    {
+        if (lexemes.Count == 0)
+            return ParserServices.CreateResult(-1, "جدع", new Node
+            { });
+
+        return DeclarationList(0, lexemes.Count);
     }
 
-    return new NoTermReturn() { rightIndex = -1, node = null,
-                                error =
-                                    $"parsing error starting at {leftIndex}" };
-  }
-
-  public static NoTermReturn Declaration(int left) {
-    // Declaration -> VarDeclaration | FunDeclaration
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    NoTermReturn varRes = VarDeclaration(left);
-    if (varRes != null) {
-      NoTermReturn ret = new NoTermReturn();
-      ret.node.Childs.Add(varRes.node);
-      ret.node.Type = "Declaration";
-      ret.rightIndex = varRes.rightIndex;
-      return ret;
-    }
-    NoTermReturn funRes = FunDeclaration(left);
-    if (funRes != null) {
-      NoTermReturn ret = new NoTermReturn();
-      ret.node.Childs.Add(ret.node);
-      ret.rightIndex = funRes.rightIndex;
-      return ret;
-    }
-
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
-
-  public static NoTermReturn VarDeclaration(int left) {
-    // varDeclaration -> typeSpecifier ID ; | typeSpecifier ID [ NUM ] ;
-    if (left >= lexemes.Count() || left < 0) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    Node _node = new Node() {
-      Type = "VarDeclaration",
-    };
-    if (TypeSpecifier(lexemes[left])) {
-      if (left + 1 >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = left + 1,
-          node = _node,
-        };
-      }
-      _node.Childs.Add(new Node() {
-        Type = lexemes[left].value,
-      });
-      if (lexemes[left + 1].type == TokenType.Ident) {
-        if (left + 2 >= lexemes.Count()) {
-          return new NoTermReturn {
-            error = $"unexpected EOF\n",
-            rightIndex = left + 1,
-            node = _node,
-          };
+    public Result DeclarationList(int start, int end)
+    {
+        if (start > end)
+            return new Result { last = -1 };
+        var path1 = Declaration(start, end);
+        // if the first path is invalid break the recursive `path`
+        if (path1.last == -1)
+        {
+            return path1;
         }
-        _node.Childs.Add(new Node() {
-          Type = lexemes[left + 1].value,
-        });
+        if (path1.last + 1 == end)
+            return path1;
+        var path2 = DeclarationList(path1.last + 1, end);
+        // if the second path is invalid return the valid `path`
 
-        if (lexemes[left + 2].type == TokenType.Simecolon) {
-          _node.Childs.Add(new Node() {
-            Type = lexemes[left + 2].value,
-          });
-          return new NoTermReturn {
-            rightIndex = left + 3,
-            node = _node,
-          };
-        } else if (lexemes[2].type == TokenType.OpenBracket) {
-          _node.Childs.Add(new Node() {
-            Type = lexemes[left + 2].value,
-          });
-          if (left + 5 >= lexemes.Count()) {
-            return new NoTermReturn {
-              error = $"unexpected EOF\n",
-              rightIndex = left + 1,
-              node = _node,
-            };
-          }
-          if (lexemes[left + 3].type == TokenType.Number) {
-            _node.Childs.Add(new Node() {
-              Type = lexemes[left + 3].value,
-            });
-            if (lexemes[left + 4].type == TokenType.CloseBracket) {
-              _node.Childs.Add(new Node() {
-                Type = lexemes[left + 4].value,
-              });
-              if (lexemes[left + 5].type == TokenType.Simecolon) {
-                _node.Childs.Add(new Node() {
-                  Type = lexemes[left + 5].value,
-                });
-                return new NoTermReturn {
-                  rightIndex = left + 6,
-                  node = _node,
-                };
-              } else {
-                return new NoTermReturn {
-                  error =
-                      $"Expected ';' at line {lexemes[left + 5].line} at column: {lexemes[left + 5].column}\n",
-                  rightIndex = left + 6,
-                  node = _node,
-                };
-              }
-            } else {
-              return new NoTermReturn {
-                error =
-                    $"Expected ']' at line {lexemes[left + 4].line} at column: {lexemes[left + 4].column}\n",
-                rightIndex = left + 5,
-                
-                node = _node,
-              };
+        // bolierplate code to create a new node
+        Node node = ParserServices.CreateNode(
+            "DeclarationList", start, path2.last + 1, path1.node, path2.node);
+        Result result = ParserServices.CreateResult(path2.last,path1.error+" "+ path2.error, node);
+        return result;
+    }
+
+    public Result Declaration(int start, int end)
+    {
+        var path1 = VarDeclaration(start, end);
+        var path2 = FunDeclaration(start, end);
+        if (path1.last == -1 && path2.last == -1)
+        {
+            return new Result { last = -1, error = "" + path1.error +" or "+ path2.error };
+        }
+        var result =
+            new Result { node = new Node { Type = "Declaration", left = start } };
+        if (path1.last != -1)
+        {
+            if (path1.node is not null)
+                result.node.Children.Add(path1.node);
+            result.last = path1.last;
+            result.node.right = path1.last + 1;
+            result.error = path1.error;
+        }
+        if (path2.last != -1)
+        {
+            if (path2.node is not null)
+                result.node.Children.Add(path2.node);
+            result.last = path2.last;
+            result.node.right = path2.last + 1;
+            result.error = path2.error;
+        }
+        return result;
+    }
+
+    public Result VarDeclaration(int start, int end)
+    {
+        int i = start;
+        if (start > end - 3)
+            return ParserServices.CreateResult(
+                -1, $"incomplete VarDeclaration at line:{lexemes[i].line}");
+        if (start < end - 5 && lexemes[start + 2].type == TokenType.OpenBracket)
+        {
+            if (ParserServices.TypeSpecifier(lexemes[i++]) &&
+                lexemes[i++].type == TokenType.Ident &&
+                lexemes[i++].type == TokenType.OpenBracket &&
+                lexemes[i++].type == TokenType.Number &&
+                lexemes[i++].type == TokenType.CloseBracket &&
+                lexemes[i].type == TokenType.Simecolon)
+            {
+                return ParserServices.CreateResult(
+                    i, "", ParserServices.CreateNode("VarDeclaration", start, i));
             }
-          } else {
-            return new NoTermReturn {
-              error =
-                  $"Expected Number at line {lexemes[left + 3].line} at column: {lexemes[left + 3].column}\n",
-              rightIndex = left + 4,
-              node = _node,
-            };
-          }
-        } else if (lexemes[2].type == TokenType.OpenPar) {
-          return new NoTermReturn {
-            error = $"goto declarefunction",
-            rightIndex = left + 4,
-            node = null,
-          };
+            return ParserServices.CreateResult(
+                -1,
+                $"incorrect VarDeclaration at line: {lexemes[i-1].line} col: {lexemes[i-1].column}");
         }
-      } else {
-        int line = lexemes[left].line;
-        int column = lexemes[left].column + lexemes[left].value.Length + 1;
-
-        for (; left < lexemes.Count(); left++) {
-          if (lexemes[left].type == TokenType.Simecolon) {
-            return new NoTermReturn {
-              error =
-                  $"Expected Identifier at line {line} at column: {column}\n",
-              rightIndex = left + 1,
-              node = _node,
-            };
-          }
-        }
-      }
-    } else {
-      int line = lexemes[left].line;
-      int column = lexemes[left].column;
-      for (; left < lexemes.Count(); left++) {
-        if (lexemes[left].type == TokenType.Simecolon) {
-          return new NoTermReturn {
-            error =
-                $"Expected type-specifier at line {line} at column: {column}\n",
-            rightIndex = left + 1,
-            node = _node,
-          };
-        }
-      }
-    }
-
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
-
-  public static bool TypeSpecifier(Lexeme identif) {
-    return identif.type == TokenType.Void_ || identif.type == TokenType.real_ ||
-           identif.type == TokenType.num_;
-  }
-
-  public static NoTermReturn FunDeclaration(int left) {
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    // FunDeclaration -> typeSpecifier ID ( params ) compoundStmt
-    Node _node = new Node() {
-      Type = "FunDeclaration",
-    };
-    if (TypeSpecifier(lexemes[left])) {
-      _node.Childs.Add(new Node() {
-        Type = lexemes[left].value,
-      });
-      if (left + 1 >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = left + 1,
-          node = _node,
-        };
-      }
-      if (lexemes[left + 1].type == TokenType.Ident) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[left + 1].value,
-        });
-        if (left + 2 >= lexemes.Count()) {
-          return new NoTermReturn {
-            error = $"unexpected EOF\n",
-            rightIndex = left + 1,
-            node = _node,
-          };
-        }
-        if (lexemes[left + 2].type == TokenType.OpenPar) {
-          _node.Childs.Add(new Node() {
-            Type = lexemes[left + 2].value,
-          });
-          NoTermReturn paramsRes = Params(left + 3);
-          if (paramsRes.node != null) {
-            _node.Childs.Add(paramsRes.node);
-            if (paramsRes.rightIndex >= lexemes.Count()) {
-              return new NoTermReturn {
-                error = $"unexpected EOF\n",
-                rightIndex = paramsRes.rightIndex,
-                node = _node,
-              };
+        else
+        {
+            if (ParserServices.TypeSpecifier(lexemes[i++]) &&
+                lexemes[i++].type == TokenType.Ident &&
+                lexemes[i].type == TokenType.Simecolon)
+            {
+                return ParserServices.CreateResult(
+                    i, "", ParserServices.CreateNode("VarDeclaration", start, i));
             }
-            if (lexemes[paramsRes.rightIndex].type == TokenType.ClosePar) {
-              _node.Childs.Add(new Node() {
-                Type = lexemes[paramsRes.rightIndex].value,
-              });
-              NoTermReturn compoundStmtRes =
-                  CompoundStmt(paramsRes.rightIndex + 1);
-              if (compoundStmtRes.node != null) {
-                _node.Childs.Add(compoundStmtRes.node);
-                return new NoTermReturn {
-                  rightIndex = compoundStmtRes.rightIndex,
-                  node = _node,
-                };
-              } else {
-                return new NoTermReturn {
-                  error =
-                      $"Expected compound statement at line {lexemes[paramsRes.rightIndex].line} at column: {lexemes[paramsRes.rightIndex].column}\n",
-                  rightIndex = paramsRes.rightIndex + 1,
-                  node = _node,
-                };
-              }
-            } else {
-              return new NoTermReturn {
-                error =
-                    $"Expected close params at line {lexemes[paramsRes.rightIndex].line} at column: {lexemes[paramsRes.rightIndex].column}\n",
-                rightIndex = paramsRes.rightIndex + 1,
-                node = _node,
-              };
+            return ParserServices.CreateResult(
+                -1,
+                $"incorrect VarDeclaration at line: {lexemes[i].line} col: {lexemes[i].column}");
+        }
+    }
+
+    public Result FunDeclaration(int start, int end)
+    {
+        int i = start;
+        // TODO: reda red write the example
+        if (start > end - 5)
+            return ParserServices.CreateResult(
+                -1, $"incomplete FunDeclaration {lexemes[start].line}");
+
+        Result path1, path2;
+        var getNextPar = (int j) =>
+        {
+            while (j < end)
+            {
+                if (lexemes[j].type == TokenType.ClosePar)
+                    return j;
+                j++;
             }
-          } else {
-            return new NoTermReturn {
-              error =
-                  $"Expected params at line {lexemes[left + 3].line} at column: {lexemes[left + 3].column}\n",
-              rightIndex = left + 4,
-              node = _node,
-            };
-          }
+            return -1;
+        };
+        int j, k;
+        if (ParserServices.TypeSpecifier(lexemes[i++]) &&
+            lexemes[i++].type == TokenType.Ident &&
+            lexemes[i++].type == TokenType.OpenPar && (j = getNextPar(i)) != -1)
+        {
+            path1 = Params(i, j++);
+            if ((k = Enders.CompoundStatementClose(j + 1, lexemes, end)) == -1)
+                return ParserServices.CreateResult(
+                    -1, $"expected {'}'} at line : {lexemes[end-1].line} ");
+            path2 = CompoundStmt(j, k);
+            return ParserServices.CreateResult(
+                k, path2.error,
+                ParserServices.CreateNode("FunDeclaration", start, k + 1, path1.node,
+                                          path2.node));
         }
-      }
-    }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
-
-  public static NoTermReturn Params(int left) {
-    // Params -> paramList | void
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    NoTermReturn paramListRes = ParamList(left);
-    if (paramListRes.node != null) {
-      return paramListRes;
-    } else {
-      return new NoTermReturn {
-        rightIndex = left + 1,
-        node =
-            new Node() {
-              Type = "Params",
-            },
-      };
-    }
-  }
-
-  public static NoTermReturn ParamList(int left) {
-    // ParamList -> param | paramList , param
-
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    if (lexemes[left].type != TokenType.ClosePar) {
-      NoTermReturn paramRes = Param(left);
-      if (paramRes.node != null) {
-        Node _node = new Node() {
-          Type = "ParamList",
-        };
-        _node.Childs.Add(paramRes.node);
-        left = paramRes.rightIndex;
-        if (lexemes[left].type == TokenType.Comma) {
-          _node.Childs.Add(new Node() {
-            Type = lexemes[left].value,
-          });
-          NoTermReturn paramListRes = ParamList(left + 1);
-          if (paramListRes.node != null) {
-            _node.Childs.Add(paramListRes.node);
-            return new NoTermReturn {
-              rightIndex = paramListRes.rightIndex,
-              node = _node,
-            };
-          } else {
-            return new NoTermReturn {
-              error =
-                  $"Expected paramList at line {lexemes[paramRes.rightIndex].line} at column: {lexemes[paramRes.rightIndex].column}\n",
-              rightIndex = paramRes.rightIndex + 1,
-              node = _node,
-            };
-          }
-        } else if (lexemes[left].type == TokenType.ClosePar) {
-          return new NoTermReturn {
-            rightIndex = left,
-            node = _node,
-          };
-        } else {
-          return new NoTermReturn {
-            error =
-                $"Expected ',' or ')' at line {lexemes[left].line} at column: {lexemes[left].column}\n",
-            rightIndex = left + 1,
-            node = _node,
-          };
-        }
-      } else {
-        return new NoTermReturn {
-          error =
-              $"Expected param at line {lexemes[left].line} at column: {lexemes[left].column}\n",
-          rightIndex = left + 1,
-          node = null,
-        };
-      }
-    }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
-
-  public static NoTermReturn Param(int left) {
-    // Param -> typeSpecifier ID | typeSpecifier ID [ ]
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    Node _node = new Node() {
-      Type = "Param",
-    };
-    if (TypeSpecifier(lexemes[left])) {
-      _node.Childs.Add(new Node() {
-        Type = lexemes[left].value,
-      });
-      if (left + 1 >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = left + 1,
-          node = _node,
-        };
-      }
-      if (lexemes[left + 1].type == TokenType.Ident) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[left + 1].value,
-        });
-        return new NoTermReturn {
-          rightIndex = left + 2,
-          node = _node,
-        };
-      }
-    }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
-
-  public static NoTermReturn CompoundStmt(int left) {
-    // CompoundStmt -> { localDeclarations statementList }
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    Node _node = new Node() {
-      Type = "CompoundStmt",
-    };
-
-    NoTermReturn noTermReturn = LocalDeclarations(left + 1);
-    if (noTermReturn.node != null) {
-      _node.Childs.Add(noTermReturn.node);
-      if (noTermReturn.rightIndex >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = noTermReturn.rightIndex,
-          node = _node,
-        };
-      }
-      if (lexemes[noTermReturn.rightIndex].type == TokenType.CloseBrace) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[noTermReturn.rightIndex].value,
-        });
-        left = noTermReturn.rightIndex + 1;
-      } else {
-        return new NoTermReturn {
-          error =
-              $"Expected paranthaese at line {lexemes[noTermReturn.rightIndex].line} at column: {lexemes[noTermReturn.rightIndex].column}\n",
-          rightIndex = noTermReturn.rightIndex + 1,
-          node = _node,
-        };
-      }
-    }
-    NoTermReturn noTermReturn1 = StatementList(left + 1);
-    if (noTermReturn1.node != null) {
-      _node.Childs.Add(noTermReturn1.node);
-      if (noTermReturn1.rightIndex >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = noTermReturn1.rightIndex,
-          node = _node,
-        };
-      }
-      if (lexemes[noTermReturn1.rightIndex].type == TokenType.CloseBrace) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[noTermReturn1.rightIndex].value,
-        });
-
-        left = noTermReturn1.rightIndex + 1;
-      } else {
-        return new NoTermReturn {
-          error =
-              $"Expected paranthaese at line {lexemes[noTermReturn1.rightIndex].line} at column: {lexemes[noTermReturn1.rightIndex].column}\n",
-          rightIndex = noTermReturn1.rightIndex + 1,
-          node = _node,
-        };
-      }
+        return ParserServices.CreateResult(
+            -1,
+            $"incomplete function Declaration at line: {lexemes[i].line} column: {lexemes[i].column}");
     }
 
-    return new NoTermReturn() { rightIndex = left, node = _node };
-  }
-
-  public static NoTermReturn LocalDeclarations(int left) {
-    // LocalDeclarations -> LocalDeclarations varDeclaration | empty
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    NoTermReturn varDeclarationRes = VarDeclaration(left);
-    if (varDeclarationRes.node != null) {
-      Node _node = new Node() {
-        Type = "LocalDeclarations",
-      };
-      _node.Childs.Add(varDeclarationRes.node);
-      NoTermReturn localDeclarationsRes =
-          LocalDeclarations(varDeclarationRes.rightIndex);
-      if (localDeclarationsRes.node != null) {
-        _node.Childs.Add(localDeclarationsRes.node);
-        return new NoTermReturn {
-          rightIndex = localDeclarationsRes.rightIndex,
-          node = _node,
-        };
-      } else {
-        return new NoTermReturn {
-          rightIndex = varDeclarationRes.rightIndex,
-          node = _node,
-        };
-      }
-    }
-    return new NoTermReturn {
-      rightIndex = left,
-      node = null,
-    };
-  }
-
-  public static NoTermReturn StatementList(int left) {
-    // StatementList -> StatementList statement | empty
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    NoTermReturn statementRes = Statement(left);
-    if (statementRes.node != null) {
-      Node _node = new Node() {
-        Type = "StatementList",
-      };
-      _node.Childs.Add(statementRes.node);
-      NoTermReturn statementListRes = StatementList(statementRes.rightIndex);
-      if (statementListRes.node != null) {
-        _node.Childs.Add(statementListRes.node);
-        return new NoTermReturn {
-          rightIndex = statementListRes.rightIndex,
-          node = _node,
-        };
-      } else {
-        return new NoTermReturn {
-          rightIndex = statementRes.rightIndex,
-          node = _node,
-        };
-      }
-    }
-    return new NoTermReturn() { rightIndex = left, node = null };
-  }
-
-  public static NoTermReturn Statement(int left) {
-    // Statement -> ExpressionStmt | CompoundStmt | SelectionStmt |
-    // IterationStmt | ReturnStmt
-
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
-
-  public static NoTermReturn ExpressionStmt(int left) {
-    // ExpressionStmt -> expression ; | ;
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    Node _node = new Node() {
-      Type = "ExpressionStmt",
-    };
-    NoTermReturn expressionRes = Expression(left);
-    if (expressionRes.node != null) {
-      _node.Childs.Add(expressionRes.node);
-      if (expressionRes.rightIndex >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = expressionRes.rightIndex,
-          node = _node,
-        };
-      }
-      if (lexemes[expressionRes.rightIndex].type == TokenType.Simecolon) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[expressionRes.rightIndex].value,
-        });
-        return new NoTermReturn {
-          rightIndex = expressionRes.rightIndex + 1,
-          node = _node,
-        };
-      } else {
-        return new NoTermReturn {
-          error =
-              $"Expected ';' at line {lexemes[expressionRes.rightIndex].line} at column: {lexemes[expressionRes.rightIndex].column}\n",
-          rightIndex = expressionRes.rightIndex + 1,
-          node = _node,
-        };
-      }
-    } else {
-      if (lexemes[left].type == TokenType.Simecolon) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[left].value,
-        });
-        return new NoTermReturn {
-          rightIndex = left + 1,
-          node = _node,
-        };
-      }
-    }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
-
-  public static NoTermReturn SelectionStmt(int left) {
-    // SelectionStmt -> if ( expression ) statement | if ( expression )
-    // statement else statement
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    Node _node = new Node() {
-      Type = "SelectionStmt",
-    };
-    if (lexemes[left].type == TokenType.if_) {
-      _node.Childs.Add(new Node() {
-        Type = lexemes[left].value,
-      });
-      if (left + 1 >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = left + 1,
-          node = _node,
-        };
-      }
-      if (lexemes[left + 1].type == TokenType.OpenPar) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[left + 1].value,
-        });
-        NoTermReturn expressionRes = Expression(left + 2);
-        if (expressionRes.node != null) {
-          _node.Childs.Add(expressionRes.node);
-          if (expressionRes.rightIndex >= lexemes.Count()) {
-            return new NoTermReturn {
-              error = $"unexpected EOF\n",
-              rightIndex = expressionRes.rightIndex,
-              node = _node,
-            };
-          }
-          if (lexemes[expressionRes.rightIndex].type == TokenType.ClosePar) {
-            _node.Childs.Add(new Node() {
-              Type = lexemes[expressionRes.rightIndex].value,
-            });
-            NoTermReturn statementRes = Statement(expressionRes.rightIndex + 1);
-            if (statementRes.node != null) {
-              _node.Childs.Add(statementRes.node);
-              if (statementRes.rightIndex >= lexemes.Count()) {
-                return new NoTermReturn {
-                  error = $"unexpected EOF\n",
-                  rightIndex = statementRes.rightIndex,
-                  node = _node,
-                };
-              }
-              if (lexemes[statementRes.rightIndex].type == TokenType.else_) {
-                _node.Childs.Add(new Node() {
-                  Type = lexemes[statementRes.rightIndex].value,
-                });
-                NoTermReturn statementRes2 =
-                    Statement(statementRes.rightIndex + 1);
-                if (statementRes2.node != null) {
-                  _node.Childs.Add(statementRes2.node);
-                  return new NoTermReturn {
-                    rightIndex = statementRes2.rightIndex,
-                    node = _node,
-                  };
-                } else {
-                  return new NoTermReturn {
-                    error =
-                        $"Expected statement at line {lexemes[statementRes.rightIndex].line} at column: {lexemes[statementRes.rightIndex].column}\n"
-                  };
+    public Result Params(int start, int end)
+    {
+        // TODO: Sherif
+        var node = ParserServices.CreateNode("paramList", start, end - 1);
+        for (; start < end; start++)
+        {
+            if (ParserServices.TypeSpecifier(lexemes[start++]) &&
+                lexemes[start++].type == TokenType.Ident)
+            {
+                if (lexemes[start].type == TokenType.Comma || start == end)
+                    node.Children.Add(
+                        ParserServices.CreateNode("param", start - 2, start + 1));
+                else if (lexemes[start].type == TokenType.OpenBracket &&
+                         lexemes[++start].type == TokenType.CloseBracket &&
+                         (lexemes[start].type == TokenType.Comma || start == end))
+                {
+                    node.Children.Add(
+                        ParserServices.CreateNode("param", start - 4, start + 1));
                 }
-              }
+                else
+                    return ParserServices.CreateError(
+                        $"function paramers Incorrect at line: {lexemes[end - 1].line}");
             }
-          }
+            else
+                return ParserServices.CreateError(
+                    $"function paramers Incorrect at line: {lexemes[end - 1].line}");
         }
-      }
+        return ParserServices.CreateResult(end, "", node);
     }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
 
-  public static NoTermReturn IterationStmt(int left) {
-    // IterationStmt -> while ( expression ) statement
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
+    public Result CompoundStmt(int start, int end)
+    {
+        // compoundStmt -> { localDeclarations statementList }
+        if (start > end - 2)
+            return ParserServices.CreateError("expected compound statement");
+        if (lexemes[start++].type != TokenType.OpenBrace)
+            return ParserServices.CreateError("expected {");
+        var path1 = LocalDeclarations(start, end);
+
+        var path2 = StatementList(path1.last + 1, end);
+        if (path2.last == -1)
+            return ParserServices.CreateError(path2.error);
+       
+        if (lexemes[path2.last+1].type != TokenType.CloseBrace)
+            return ParserServices.CreateError(
+                               $"expected {'}'} at line: {lexemes[path2.last].line}");
+
+        return ParserServices.CreateResult(path2.last, "", ParserServices.CreateNode("CompoundStmt", start, path2.last + 1,path1.node, path2.node));
     }
-    Node _node = new Node() {
-      Type = "IterationStmt",
-    };
-    if (lexemes[left].type == TokenType.while_) {
-      _node.Childs.Add(new Node() {
-        Type = lexemes[left].value,
-      });
-      if (left + 1 >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = left + 1,
-          node = _node,
+
+    public Result LocalDeclarations(int start, int end)
+    {
+        if (start > end)
+            return new Result { last = -1 };
+        var path1 = Declaration(start, end);
+        // if the first path is invalid break the recursive `path`
+        if (path1.last == -1)
+        {
+            return ParserServices.CreateResult(
+                start-1, "", ParserServices.CreateNode("", start, start));
+        }
+        var path2 = DeclarationList(path1.last + 1, end);
+        // if the second path is invalid return the valid `path`
+        if (path2.last == -1)
+        {
+            return path1;
+        }
+        // bolierplate code to create a new node
+        Node node = ParserServices.CreateNode("DeclarationList", start, path2.last,
+                                              path1.node, path2.node);
+        Result result = new Result
+        {
+            node = node,
+            last = path2.last,
+            error = path1.error + path2.error
         };
-      }
-      if (lexemes[left + 1].type == TokenType.OpenPar) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[left + 1].value,
-        });
-        NoTermReturn expressionRes = Expression(left + 2);
-        if (expressionRes.node != null) {
-          _node.Childs.Add(expressionRes.node);
-          if (expressionRes.rightIndex >= lexemes.Count()) {
-            return new NoTermReturn {
-              error = $"unexpected EOF\n",
-              rightIndex = expressionRes.rightIndex,
-              node = _node,
-            };
-          }
-          if (lexemes[expressionRes.rightIndex].type == TokenType.ClosePar) {
-            _node.Childs.Add(new Node() {
-              Type = lexemes[expressionRes.rightIndex].value,
-            });
-            NoTermReturn statementRes = Statement(expressionRes.rightIndex + 1);
-            if (statementRes.node != null) {
-              _node.Childs.Add(statementRes.node);
-              return new NoTermReturn {
-                rightIndex = statementRes.rightIndex,
-                node = _node,
-              };
-            } else {
-              return new NoTermReturn {
-                error =
-                    $"Expected statement at line {lexemes[expressionRes.rightIndex].line} at column: {lexemes[expressionRes.rightIndex].column}\n",
-                rightIndex = expressionRes.rightIndex + 1,
-                node = _node,
-              };
+        return result;
+    }
+
+    public Result StatementList(int start, int end)
+    {
+        if (start > end - 1)
+            return new Result { last = -1 };
+        var path1 = Statement(start, end);
+        // if the first path is invalid break the recursive `path`
+        if (path1.last == -1)
+        {
+            return path1;
+        }
+        if (path1.last + 1== end)
+            return path1;
+        var path2 = StatementList(path1.last + 1, end);
+        // if the second path is invalid return the valid `path`
+        if (path2.last == -1)
+        {
+            return path1;
+        }
+        // bolierplate code to create a new node
+        Node node = ParserServices.CreateNode(
+            "StatementList", start, path2.last + 1, path1.node, path2.node);
+        Result result = new Result { node = node, last = path2.last };
+        return result;
+    }
+
+    public Result Statement(int start, int end)
+    {
+        if(start==end-1)
+            return ParserServices.CreateResult(start,"warning: empty statement");
+        if (start > end - 1)
+            return ParserServices.CreateError("expected statement");
+        if (lexemes[start].type == TokenType.OpenBrace)
+            return CompoundStmt(start, end);
+        if (lexemes[start].type == TokenType.if_)
+            return SelectionStmt(start, end);
+        if (lexemes[start].type == TokenType.while_)
+            return IterationStmt(start, end);
+        if (lexemes[start].type == TokenType.return_) 
+            return ReturnStmt(start, end);
+        return ExpressionStmt(start, end);
+    }
+
+    public Result ExpressionStmt(int start, int end)
+    {
+        if (start > end - 1)
+            return ParserServices.CreateError("expected expression statement");
+        var path1 = Expression(start, end);
+        if (path1.last == -1)
+            return ParserServices.CreateError(
+                $"expected expression statement at line: {lexemes[start].line}");
+        if (lexemes[path1.last].type != TokenType.Simecolon)
+            return ParserServices.CreateError(
+                $"expected {';'} at line: {lexemes[path1.last].line}");
+        return ParserServices.CreateResult(
+            path1.last, "",
+            ParserServices.CreateNode("ExpressionStmt", start, path1.last + 1,
+                                      path1.node));
+    }
+
+    public Result SelectionStmt(int start, int end)
+    {
+        if (start > end - 6)
+            return ParserServices.CreateError("expected selection statement");
+        if (lexemes[start++].type != TokenType.if_)
+            return ParserServices.CreateError("expected if statement");
+        if (lexemes[start++].type != TokenType.OpenPar)
+            return ParserServices.CreateError("expected (");
+        var path1 = Expression(start, end);
+        if (path1.last == -1)
+            return ParserServices.CreateError(
+                $"expected expression statement at line: {lexemes[start].line}");
+        if (lexemes[++path1.last].type != TokenType.ClosePar)
+            return ParserServices.CreateError(
+                $"expected ) at line: {lexemes[path1.last].line}");
+        var path2 = Statement(path1.last + 1, end);
+        if (path2.last == -1)
+            return ParserServices.CreateError(
+                $"expected statement at line: {lexemes[path1.last + 1].line}");
+        if (path2.last + 1 < end &&
+            lexemes[path2.last + 1].type == TokenType.else_)
+        {
+            var path3 = Statement(path2.last + 2, end);
+            if (path3.last == -1)
+                return ParserServices.CreateError(
+                    $"expected statement at line: {lexemes[path2.last + 2].line}");
+            return ParserServices.CreateResult(
+                path3.last, "",
+                ParserServices.CreateNode("SelectionStmt", start, path3.last + 1,
+                                          path1.node, path2.node, path3.node));
+        }
+        return ParserServices.CreateResult(
+            path2.last, "",
+            ParserServices.CreateNode("SelectionStmt", start, path2.last + 1,
+                                      path1.node, path2.node));
+    }
+
+    public Result IterationStmt(int start, int end)
+    {
+        if (start > end - 3)
+            return ParserServices.CreateError("expected iteration statement");
+        if (lexemes[start++].type != TokenType.while_)
+            return ParserServices.CreateError("expected while statement");
+        if (lexemes[start++].type != TokenType.OpenPar)
+            return ParserServices.CreateError("expected (");
+        var path1 = Expression(start, end);
+        if (path1.last == -1)
+            return ParserServices.CreateError(
+                $"expected expression statement at line: {lexemes[start].line}");
+        if (lexemes[++path1.last].type != TokenType.ClosePar)
+            return ParserServices.CreateError(
+                $"expected ) at line: {lexemes[path1.last].line}");
+        var path2 = Statement(path1.last + 1, end);
+        if (path2.last == -1)
+            return ParserServices.CreateError(
+                $"expected statement at line: {lexemes[path1.last + 1].line}");
+        return ParserServices.CreateResult(
+            path2.last, "",
+            ParserServices.CreateNode("IterationStmt", start, path2.last+1,
+                                      path1.node, path2.node));
+    }
+
+    public Result ReturnStmt(int start, int end)
+    {
+        if (start+1 > end )
+            return ParserServices.CreateError("expected return statement");
+        if (lexemes[start++].type != TokenType.return_)
+            return ParserServices.CreateError("expected return statement");
+        if (lexemes[start].type == TokenType.Simecolon)
+            return ParserServices.CreateResult(
+                               start, "",
+                                              ParserServices.CreateNode("ReturnStmt", start, start + 1));
+        var path1 = Expression(start, end);
+        if (path1.last == -1)
+            return ParserServices.CreateError(
+                               $"expected expression statement at line: {lexemes[start].line}");
+        if (lexemes[path1.last].type != TokenType.Simecolon)
+            return ParserServices.CreateError(
+                               $"expected ; at line: {lexemes[path1.last].line}");
+        return ParserServices.CreateResult(
+                       path1.last, "",
+                                  ParserServices.CreateNode("ReturnStmt", start, path1.last + 1,
+                                                                       path1.node));
+    }
+
+    public Result Expression(int start, int end)
+    {
+        // expretion ->  var = expression | simpleExpression
+        if (start > end - 1)
+            return ParserServices.CreateError("expected expression");
+        var path1 = Var(start, end);
+        if (path1.last != -1)
+        {
+            if (path1.last + 1 < end &&
+                               lexemes[path1.last + 1].type == TokenType.equal_)
+            {
+                var path2 = Expression(path1.last + 2, end);
+                if (path2.last == -1)
+                    return ParserServices.CreateError(
+                                               $"expected expression at line: {lexemes[path1.last + 2].line}");
+                return ParserServices.CreateResult(
+                                       path2.last, "",
+                                                          ParserServices.CreateNode("Expression", start, path2.last + 1,
+                                                                                                       path1.node, path2.node));
             }
-          } else {
-            return new NoTermReturn {
-              error =
-                  $"Expected ')' at line {lexemes[expressionRes.rightIndex].line} at column: {lexemes[expressionRes.rightIndex].column}\n",
-              rightIndex = expressionRes.rightIndex + 1,
-              node = _node,
-            };
-          }
-        } else {
-          return new NoTermReturn {
-            error =
-                $"Expected expression at line {lexemes[left + 2].line} at column: {lexemes}"
-          };
+
+            return SimpleExpression(start, end);
         }
-      }
+        return SimpleExpression(start, end);
     }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
 
-  public static NoTermReturn ReturnStmt(int left) {
-    // ReturnStmt -> return ; | return expression ;
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    Node _node = new Node() {
-      Type = "ReturnStmt",
-    };
-    if (lexemes[left].type == TokenType.return_) {
-      _node.Childs.Add(new Node() {
-        Type = lexemes[left].value,
-      });
-      if (left + 1 >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = left + 1,
-          node = _node,
-        };
-      }
-      if (lexemes[left + 1].type == TokenType.Simecolon) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[left + 1].value,
-        });
-        return new NoTermReturn {
-          rightIndex = left + 2,
-          node = _node,
-        };
-      } else {
-        NoTermReturn expressionRes = Expression(left + 1);
-        if (expressionRes.node != null) {
-          _node.Childs.Add(expressionRes.node);
-          if (expressionRes.rightIndex >= lexemes.Count()) {
-            return new NoTermReturn {
-              error = $"unexpected EOF\n",
-              rightIndex = expressionRes.rightIndex,
-              node = _node,
-            };
-          }
-          if (lexemes[expressionRes.rightIndex].type == TokenType.Simecolon) {
-            _node.Childs.Add(new Node() {
-              Type = lexemes[expressionRes.rightIndex].value,
-            });
-            return new NoTermReturn {
-              rightIndex = expressionRes.rightIndex + 1,
-              node = _node,
-            };
-          } else {
-            return new NoTermReturn {
-              error =
-                  $"Expected ';' at line {lexemes[expressionRes.rightIndex].line} at column: {lexemes[expressionRes.rightIndex].column}\n",
-              rightIndex = expressionRes.rightIndex + 1,
-              node = _node,
-            };
-          }
-        } else {
-          return new NoTermReturn {
-            error =
-                $"Expected expression at line {lexemes[left + 1].line} at column: {lexemes[left + 1].column}\n",
-            rightIndex = left + 2,
-            node = _node,
-          };
+    public Result Var(int start, int end)
+    {
+        int i = start;
+        if (start < end && lexemes[i++].type != TokenType.Ident)
+        {
+            return ParserServices.CreateError("expected variable");
         }
-      }
-    }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
+        Result path1;
+        if (start < end && lexemes[i++].type == TokenType.OpenBracket)
+        {
+            int j = Enders.BracetClose(i, lexemes, end);
+            if (j == -1)
+                return ParserServices.CreateError(
+                    $"expected ] at line: {lexemes[start].line}");
 
-  public static NoTermReturn Expression(int left) {
-    // Expression -> var = expression | simpleExpression
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    NoTermReturn varRes = Var(left);
-    if (varRes.node != null) {
-      Node _node = new Node() {
-        Type = "Expression",
-      };
-      _node.Childs.Add(varRes.node);
-      if (varRes.rightIndex >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = varRes.rightIndex,
-          node = _node,
-        };
-      }
-      if (lexemes[varRes.rightIndex].type == TokenType.equal_) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[varRes.rightIndex].value,
-        });
-        NoTermReturn expressionRes = Expression(varRes.rightIndex + 1);
-        if (expressionRes.node != null) {
-          _node.Childs.Add(expressionRes.node);
-          return new NoTermReturn {
-            rightIndex = expressionRes.rightIndex,
-            node = _node,
-          };
-        } else {
-          return new NoTermReturn {
-            error =
-                $"Expected expression at line {lexemes[varRes.rightIndex].line} at column: {lexemes[varRes.rightIndex].column}\n",
-            rightIndex = varRes.rightIndex + 1,
-            node = _node,
-          };
+            path1 = Expression(i, j);
+            if (path1.last == -1)
+                return ParserServices.CreateError(
+                    $"expected a valid expression in line: {lexemes[i].line}");
+            return ParserServices.CreateResult(
+                j, "", ParserServices.CreateNode("Var", i, j + 1, path1.node));
         }
-      } else {
-        return new NoTermReturn {
-          rightIndex = varRes.rightIndex,
-          node = _node,
-        };
-      }
+        return ParserServices.CreateResult(
+            start, "", ParserServices.CreateNode("Var", start, start + 1));
     }
-    NoTermReturn simpleExpressionRes = SimpleExpression(left);
-    if (simpleExpressionRes.node != null) {
-      return simpleExpressionRes;
-    }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
 
-  public static NoTermReturn Var(int left) {
-    // Var -> ID | ID [ expression ]
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    Node _node = new Node() {
-      Type = "Var",
-    };
-    if (lexemes[left].type == TokenType.Ident) {
-      _node.Childs.Add(new Node() {
-        Type = lexemes[left].value,
-      });
-      if (left + 1 >= lexemes.Count()) {
-        return new NoTermReturn {
-          rightIndex = left + 1,
-          node = _node,
-        };
-      }
-      if (lexemes[left + 1].type == TokenType.OpenBracket) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[left + 1].value,
-        });
-        NoTermReturn expressionRes = Expression(left + 2);
-        if (expressionRes.node != null) {
-          _node.Childs.Add(expressionRes.node);
-          if (expressionRes.rightIndex >= lexemes.Count()) {
-            return new NoTermReturn {
-              error = $"unexpected EOF\n",
-              rightIndex = expressionRes.rightIndex,
-              node = _node,
-            };
-          }
-          if (lexemes[expressionRes.rightIndex].type ==
-              TokenType.CloseBracket) {
-            _node.Childs.Add(new Node() {
-              Type = lexemes[expressionRes.rightIndex].value,
-            });
-            return new NoTermReturn {
-              rightIndex = expressionRes.rightIndex + 1,
-              node = _node,
-            };
-          } else {
-            return new NoTermReturn {
-              error =
-                  $"Expected ']' at line {lexemes[expressionRes.rightIndex].line} at column: {lexemes[expressionRes.rightIndex].column}\n",
-              rightIndex = expressionRes.rightIndex + 1,
-              node = _node,
-            };
-          }
-        } else {
-          return new NoTermReturn {
-            error =
-                $"Expected expression at line {lexemes[left + 2].line} at column: {lexemes[left + 2].column}\n",
-            rightIndex = left + 3,
-            node = _node,
-          };
+    public Result SimpleExpression(int start, int end)
+    {
+        // simpleExpression -> additiveExpression | additiveExpression logOp additiveExpression
+        if (start > end - 1)
+            return ParserServices.CreateError("expected simple expression");
+        var path1 = AdditiveExpression(start, end);
+        if (path1.last == -1)
+            return ParserServices.CreateError(
+                $"expected additive expression at line: {lexemes[start].line}");
+        if (path1.last + 1 < end &&
+            lexemes[path1.last+1].type == TokenType.LogOp)
+        {
+            var path2 = AdditiveExpression(path1.last + 2, end);
+            if (path2.last == -1)
+                return ParserServices.CreateError(
+                    $"expected additive expression at line: {lexemes[path1.last + 2].line}");
+            return ParserServices.CreateResult(
+                path2.last, "",
+                ParserServices.CreateNode("SimpleExpression", start, path2.last + 1,
+                                          path1.node, path2.node));
         }
-      }
-      return new NoTermReturn {
-        rightIndex = left + 1,
-        node = _node,
-      };
+        return ParserServices.CreateResult(
+            path1.last, "",
+            ParserServices.CreateNode("SimpleExpression", start, path1.last + 1,
+                                      path1.node));
     }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
 
-  public static NoTermReturn SimpleExpression(int left) {
-    // SimpleExpression -> AdditiveExpression relop AdditiveExpression |
-    // AdditiveExpression
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    NoTermReturn addRes = AdditiveExpression(left);
-    if (addRes.node != null) {
-      Node _node = new Node() {
-        Type = "SimpleExpression",
-      };
-      _node.Childs.Add(addRes.node);
-      if (addRes.rightIndex >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = addRes.rightIndex,
-          node = _node,
-        };
-      }
-      if (relOps(addRes.rightIndex)) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[addRes.rightIndex].value,
-        });
-        NoTermReturn addRes2 = AdditiveExpression(addRes.rightIndex + 1);
-        if (addRes2.node != null) {
-          _node.Childs.Add(addRes2.node);
-          return new NoTermReturn {
-            rightIndex = addRes2.rightIndex,
-            node = _node,
-          };
-        } else {
-          return new NoTermReturn {
-            error =
-                $"Expected AdditiveExpression at line {lexemes[addRes.rightIndex].line} at column: {lexemes[addRes.rightIndex].column}\n",
-            rightIndex = addRes.rightIndex + 1,
-            node = _node,
-          };
+    public Result AdditiveExpression(int start, int end)
+    {
+        if (start > end - 1)
+            return ParserServices.CreateError("expected additive expression");
+        var path1 = Term(start, end);
+        if (path1.last == -1)
+            return ParserServices.CreateError(
+                $"expected term at line: {lexemes[start].line}");
+        if (path1.last + 1 < end &&
+            lexemes[path1.last + 1].type == TokenType.AddOp)
+        {
+            var path2 = AdditiveExpression(path1.last + 2, end);
+            if (path2.last == -1)
+                return ParserServices.CreateError(
+                    $"expected additive expression at line: {lexemes[path1.last + 2].line}");
+            return ParserServices.CreateResult(
+                path2.last, "",
+                ParserServices.CreateNode("AdditiveExpression", start, path2.last + 1,
+                                          path1.node, path2.node));
         }
-      } else {
-        return new NoTermReturn {
-          rightIndex = addRes.rightIndex,
-          node = _node,
-        };
-      }
+        return ParserServices.CreateResult(
+            path1.last, "",
+            ParserServices.CreateNode("AdditiveExpression", start, path1.last + 1,
+                                      path1.node));
     }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
 
-  public static NoTermReturn AdditiveExpression(int left) {
-    // AdditiveExpression -> AdditiveExpression addOp Term | Term
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    NoTermReturn addRes = AdditiveExpression(left);
-    if (addRes.node != null) {
-      Node _node = new Node() {
-        Type = "AdditiveExpression",
-      };
-      _node.Childs.Add(addRes.node);
-      if (addRes.rightIndex >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = addRes.rightIndex,
-          node = _node,
-        };
-      }
-      if (addOps(addRes.rightIndex)) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[addRes.rightIndex].value,
-        });
-        NoTermReturn termRes = Term(addRes.rightIndex + 1);
-        if (termRes.node != null) {
-          _node.Childs.Add(termRes.node);
-          return new NoTermReturn {
-            rightIndex = termRes.rightIndex,
-            node = _node,
-          };
-        } else {
-          return new NoTermReturn {
-            error =
-                $"Expected term at line {lexemes[addRes.rightIndex].line} at column: {lexemes[addRes.rightIndex].column}\n",
-            rightIndex = addRes.rightIndex + 1,
-            node = _node,
-          };
+    public Result Term(int start, int end)
+    {
+        if (start > end - 1)
+            return ParserServices.CreateError("expected term");
+        var path1 = Factor(start, end);
+        if (path1.last == -1)
+            return ParserServices.CreateError(
+                $"expected factor at line: {lexemes[start].line}");
+        if (path1.last + 1 < end &&
+            lexemes[path1.last + 1].type == TokenType.MulOp)
+        {
+            var path2 = Term(path1.last + 2, end);
+            if (path2.last == -1)
+                return ParserServices.CreateError(
+                    $"expected term at line: {lexemes[path1.last + 2].line}");
+            return ParserServices.CreateResult(
+                path2.last, "",
+                ParserServices.CreateNode("Term", start, path2.last + 1, path1.node,
+                                          path2.node));
         }
-      } else {
-        return new NoTermReturn {
-          rightIndex = addRes.rightIndex,
-          node = _node,
-        };
-      }
-    } else {
-      NoTermReturn termRes = Term(left);
-      if (termRes.node != null) {
-        return new NoTermReturn {
-          rightIndex = termRes.rightIndex,
-          node = termRes.node,
-        };
-      }
+        return ParserServices.CreateResult(
+            path1.last, "",
+            ParserServices.CreateNode("Term", start, path1.last + 1, path1.node));
     }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
 
-  public static NoTermReturn Term(int left) {
-    // Term -> Term mulOp Factor | Factor
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    NoTermReturn termRes = Term(left);
-    if (termRes.node != null) {
-      Node _node = new Node() {
-        Type = "Term",
-      };
-      _node.Childs.Add(termRes.node);
-      if (termRes.rightIndex >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = termRes.rightIndex,
-          node = _node,
-        };
-      }
-      if (multOps(termRes.rightIndex)) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[termRes.rightIndex].value,
-        });
-        NoTermReturn factorRes = Factor(termRes.rightIndex + 1);
-        if (factorRes.node != null) {
-          _node.Childs.Add(factorRes.node);
-          return new NoTermReturn {
-            rightIndex = factorRes.rightIndex,
-            node = _node,
-          };
-        } else {
-          return new NoTermReturn {
-            error =
-                $"Expected factor at line {lexemes[termRes.rightIndex].line} at column: {lexemes[termRes.rightIndex].column}\n",
-            rightIndex = termRes.rightIndex + 1,
-            node = _node,
-          };
+    public Result Factor(int start, int end)
+    {
+        // factor -> ( expression ) | var | call | args| Num
+        if (start > end - 1)
+            return ParserServices.CreateError("expected factor");
+        if (lexemes[start].type == TokenType.Number)
+            return ParserServices.CreateResult(
+                               start, "",   
+                                              ParserServices.CreateNode("Factor", start, start + 1));
+        if (lexemes[start].type == TokenType.OpenPar)
+        {
+            var path1 = Expression(start + 1, end);
+            if (path1.last == -1)
+                return ParserServices.CreateError(
+                    $"expected expression at line: {lexemes[start].line}");
+            if (path1.last + 1 < end &&
+                lexemes[path1.last + 1].type != TokenType.ClosePar)
+            {
+                return ParserServices.CreateError(
+                    $"expected ) at line: {lexemes[path1.last].line}");
+            }
+            return ParserServices.CreateResult(
+                path1.last + 1, "",
+                ParserServices.CreateNode("Factor", start, path1.last + 2,
+                                          path1.node));
         }
-      } else {
-        return new NoTermReturn {
-          rightIndex = termRes.rightIndex,
-          node = _node,
-        };
-      }
-    } else {
-      NoTermReturn factorRes = Factor(left);
-      if (factorRes.node != null) {
-        return new NoTermReturn {
-          rightIndex = factorRes.rightIndex,
-          node = factorRes.node,
-        };
-      }
-    }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
+        var path = Var(start, end);
+        if (path.last != -1)
+            return path;
+        path = Call(start, end);
+       // path = path.last != -1 ? path : Args(start, end);
 
-  public static NoTermReturn Factor(int left) {
-    // Factor -> ( expression ) | var | call | num
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
+
+        return path;
     }
-    Node _node = new Node() {
-      Type = "Factor",
-    };
-    if (lexemes[left].type == TokenType.OpenPar) {
-      _node.Childs.Add(new Node() {
-        Type = lexemes[left].value,
-      });
-      NoTermReturn expressionRes = Expression(left + 1);
-      if (expressionRes.node != null) {
-        _node.Childs.Add(expressionRes.node);
-        if (expressionRes.rightIndex >= lexemes.Count()) {
-          return new NoTermReturn {
-            error = $"unexpected EOF\n",
-            rightIndex = expressionRes.rightIndex,
-            node = _node,
-          };
+
+    public Result Call(int start, int end)
+    {
+        if (start > end - 2)
+            return ParserServices.CreateError("expected call");
+        if (lexemes[start++].type != TokenType.Ident)
+            return ParserServices.CreateError("expected ident");
+        if (lexemes[start++].type != TokenType.OpenPar)
+            return ParserServices.CreateError("expected (");
+        var path1 = Args(start, end);
+        if (path1.last == -1)
+            return ParserServices.CreateError(
+                $"expected args at line: {lexemes[start].line}");
+        if (lexemes[path1.last].type != TokenType.ClosePar)
+            return ParserServices.CreateError(
+                $"expected ) at line: {lexemes[path1.last].line}");
+        return ParserServices.CreateResult(
+            path1.last, "",
+            ParserServices.CreateNode("Call", start, path1.last + 1, path1.node));
+    }
+
+    public Result Args(int start, int end)
+    {
+        if (start > end)
+            return new Result { last = -1 };
+        var path1 = Expression(start, end);
+        // if the first path is invalid break the recursive `path`
+        if (path1.last == -1)
+        {
+            return path1;
         }
-        if (lexemes[expressionRes.rightIndex].type == TokenType.ClosePar) {
-          _node.Childs.Add(new Node() {
-            Type = lexemes[expressionRes.rightIndex].value,
-          });
-          return new NoTermReturn {
-            rightIndex = expressionRes.rightIndex + 1,
-            node = _node,
-          };
-        } else {
-          return new NoTermReturn {
-            error =
-                $"Expected ')' at line {lexemes[expressionRes.rightIndex].line} at column: {lexemes[expressionRes.rightIndex].column}\n",
-            rightIndex = expressionRes.rightIndex + 1,
-            node = _node,
-          };
+        if (path1.last + 1 == end)
+            return path1;
+        if (lexemes[path1.last].type != TokenType.Comma)
+            return path1;
+        var path2 = Args(path1.last + 1, end);
+        // if the second path is invalid return the valid `path`
+        if (path2.last == -1)
+        {
+            return path1;
         }
-      } else {
-        return new NoTermReturn {
-          error =
-              $"Expected expression at line {lexemes[left + 1].line} at column: {lexemes[left + 1].column}\n",
-          rightIndex = left + 2,
-          node = _node,
-        };
-      }
-    } else if (lexemes[left].type == TokenType.Ident) {
-      NoTermReturn varRes = Var(left);
-      if (varRes.node != null) {
-        _node.Childs.Add(varRes.node);
-        return new NoTermReturn {
-          rightIndex = varRes.rightIndex,
-          node = _node,
-        };
-      } else {
-        NoTermReturn callRes = Call(left);
-        if (callRes.node != null) {
-          _node.Childs.Add(callRes.node);
-          return new NoTermReturn {
-            rightIndex = callRes.rightIndex,
-            node = _node,
-          };
-        } else {
-          return new NoTermReturn {
-            error = $"Expected var or call at line {lexemes[left]}"
-          };
+        // bolierplate code to create a new node
+        Node node = ParserServices.CreateNode("Args", start, path2.last + 1,
+                                              path1.node, path2.node);
+        Result result = new Result { node = node, last = path2.last };
+        return result;
+    }
+
+    public Result ArgList(int start, int end)
+    {
+        if (start > end)
+            return new Result { last = -1 };
+        var path1 = Expression(start, end);
+        // if the first path is invalid break the recursive `path`
+        if (path1.last == -1)
+        {
+            return path1;
         }
-      }
-    } else if (lexemes[left].type == TokenType.Number) {
-      _node.Childs.Add(new Node() {
-        Type = lexemes[left].value,
-      });
-      return new NoTermReturn {
-        rightIndex = left + 1,
-        node = _node,
-      };
-    }
-    NoTermReturn call_ = Call(left);
-    if (call_.node != null) {
-      _node.Childs.Add(call_.node);
-      return new NoTermReturn {
-        rightIndex = call_.rightIndex,
-        node = _node,
-      };
-    }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
-
-  public static NoTermReturn Call(int left) {
-    // Call -> ID ( args )
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    Node _node = new Node() {
-      Type = "Call",
-    };
-    if (lexemes[left].type == TokenType.Ident) {
-      _node.Childs.Add(new Node() {
-        Type = lexemes[left].value,
-      });
-      if (left + 1 >= lexemes.Count()) {
-        return new NoTermReturn {
-          error = $"unexpected EOF\n",
-          rightIndex = left + 1,
-          node = _node,
-        };
-      }
-      if (lexemes[left + 1].type == TokenType.OpenPar) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[left + 1].value,
-        });
-        NoTermReturn argsRes = Args(left + 2);
-        if (argsRes.node != null) {
-          _node.Childs.Add(argsRes.node);
-          if (argsRes.rightIndex >= lexemes.Count()) {
-            return new NoTermReturn {
-              error = $"unexpected EOF\n",
-              rightIndex = argsRes.rightIndex,
-              node = _node,
-            };
-          }
-          if (lexemes[argsRes.rightIndex].type == TokenType.ClosePar) {
-            _node.Childs.Add(new Node() {
-              Type = lexemes[argsRes.rightIndex].value,
-            });
-            return new NoTermReturn {
-              rightIndex = argsRes.rightIndex + 1,
-              node = _node,
-            };
-          } else {
-            return new NoTermReturn {
-              error =
-                  $"Expected ')' at line {lexemes[argsRes.rightIndex].line} at column: {lexemes[argsRes.rightIndex].column}\n",
-              rightIndex = argsRes.rightIndex + 1,
-              node = _node,
-            };
-          }
-        } else {
-          return new NoTermReturn {
-            error =
-                $"Expected args at line {lexemes[left + 2].line} at column: {lexemes[left + 2].column}\n",
-            rightIndex = left + 3,
-            node = _node,
-          };
+        if (path1.last + 1 == end)
+            return path1;
+        if (lexemes[path1.last].type != TokenType.Comma)
+            return path1;
+        var path2 = ArgList(path1.last + 1, end);
+        // if the second path is invalid return the valid `path`
+        if (path2.last == -1)
+        {
+            return path1;
         }
-      } else {
-        return new NoTermReturn {
-          error =
-              $"Expected '(' at line {lexemes[left + 1].line} at column: {lexemes[left + 1].column}\n",
-          rightIndex = left + 2,
-          node = _node,
-        };
-      }
-    } else {
-      return new NoTermReturn {
-        error =
-            $"Expected Identifier at line {lexemes[left].line} at column: {lexemes[left].column}\n",
-        rightIndex = left + 1,
-        node = _node,
-      };
+        // bolierplate code to create a new node
+        Node node = ParserServices.CreateNode("ArgList", start, path2.last + 1,
+                                              path1.node, path2.node);
+        Result result = new Result { node = node, last = path2.last };
+        return result;
     }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
-
-  public static NoTermReturn Args(int left) {
-    // Args -> argList | empty
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    NoTermReturn noTermReturn = ArgList(left);
-    if (noTermReturn.node != null) {
-      return noTermReturn;
-    }
-    return new NoTermReturn() { rightIndex = left, node = null };
-  }
-
-  public static NoTermReturn ArgList(int left) {
-    // ArgList -> expression | ArgList , expression
-    if (left >= lexemes.Count()) {
-      return new NoTermReturn() { rightIndex = left, node = null };
-    }
-    NoTermReturn expressionRes = Expression(left);
-    if (expressionRes.node != null) {
-      Node _node = new Node() {
-        Type = "ArgList",
-      };
-      _node.Childs.Add(expressionRes.node);
-      left = expressionRes.rightIndex;
-      if (lexemes[left].type == TokenType.Comma) {
-        _node.Childs.Add(new Node() {
-          Type = lexemes[left].value,
-        });
-        NoTermReturn argListRes = ArgList(left + 1);
-        if (argListRes.node != null) {
-          _node.Childs.Add(argListRes.node);
-          return new NoTermReturn {
-            rightIndex = argListRes.rightIndex,
-            node = _node,
-          };
-        } else {
-          return new NoTermReturn {
-            error =
-                $"Expected ArgList at line {lexemes[left].line} at column: {lexemes[left].column}\n",
-            rightIndex = left + 1,
-            node = _node,
-          };
-        }
-      } else {
-        return new NoTermReturn {
-          rightIndex = left,
-          node = _node,
-        };
-      }
-    }
-    return new NoTermReturn() { rightIndex = -1, node = null };
-  }
-
-  public static bool addOps(int left) {
-    if (left >= lexemes.Count()) {
-      return false;
-    }
-    return lexemes[left].type == TokenType.AddOp;
-  }
-
-  public static bool multOps(int left) {
-    if (left >= lexemes.Count()) {
-      return false;
-    }
-    return lexemes[left].type == TokenType.MulOp;
-  }
-
-  public static bool relOps(int left) {
-    // RelOp -> <= | < | > | >= | == | !=
-    if (left >= lexemes.Count()) {
-      return false;
-    }
-    return lexemes[left].type == TokenType.LogOp;
-  }
-}
 }

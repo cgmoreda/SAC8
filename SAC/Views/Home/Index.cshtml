@@ -1,5 +1,5 @@
 ﻿@{
-    Layout=null;
+    Layout = null;
 }
 
 <!DOCTYPE html>
@@ -18,8 +18,8 @@
     <!-- Google Web Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Roboto:wght@500;700&display=swap" rel="stylesheet"> 
-    
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Roboto:wght@500;700&display=swap" rel="stylesheet">
+
     <!-- Icon Font Stylesheet -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.10.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.1/font/bootstrap-icons.css" rel="stylesheet">
@@ -35,82 +35,79 @@
     <link href="/assets/css/style.css" rel="stylesheet">
 
     <style>
-        .token{
-            color:blue;
+        .token {
+            color: blue;
         }
-        .ident{
-            color:blueviolet;
+
+        .ident {
+            color: blueviolet;
         }
-        .number{
-            color:yellow;
-        }   
+
+        .number {
+            color: yellow;
+        }
     </style>
 </head>
 
 <body>
     <div class="container-fluid position-relative d-flex p-0">
         <!-- Spinner Start -->
-       
         <!-- Spinner End -->
-
-
         <!-- Sidebar Start -->
         <div class="sidebar pe-4 pb-3">
             <nav class="navbar bg-secondary navbar-dark">
                 <a href="##" class="navbar-brand mx-4 mb-3">
                     <h3 class="text-primary"><i class="fa fa-user-edit me-2"></i>SAC</h3>
                 </a>
-               
+
                 <div class="navbar-nav w-100">
-                     
-              
+
+
                     <a onclick="Run()" class="nav-item nav-link"><i class="fa fa-keyboard me-2"></i>Run</a>
-                  
-                   
+
+
                 </div>
             </nav>
-        </div>  
-   
+        </div>
+
         <div class="content">
             <div class="container-fluid pt-4 px-4">
                 <div class="row g-4">
                     <div class="col-sm-12 col-xl-9">
-                  <div class="bg-secondary text-center rounded p-4">
-                 <div class="d-flex align-items-center justify-content-between mb-4">
-                      <h6 class="mb-0">Source Code</h6>
-                 </div>
-                 <textarea id="sourcecode" class="form-control form-control-lg w-100" rows="11" placeholder="Enter your text here..." dir="rtl"></textarea>
-               </div>
-            </div>
-                <div class="col-sm-12 col-xl-3">
+                        <div class="bg-secondary text-center rounded p-4">
+                            <div class="d-flex align-items-center justify-content-between mb-4">
+                                <h6 class="mb-0">Source Code</h6>
+                            </div>
+                            <textarea  id="sourcecode" class="form-control form-control-lg w-100" rows="11" placeholder="Enter your text here..." dir="rtl"></textarea>
+                        </div>
+                    </div>
+                    <div class="col-sm-12 col-xl-3">
                         <div class="bg-secondary text-center rounded p-4">
                             <div class="d-flex align-items-center justify-content-between mb-4">
                                 <h6 class="mb-0">Output</h6>
-                              
+
                             </div>
-                            <textarea id="output" class="form-control form-control-lg w-100" rows="11" ></textarea>
-         
+                            <textarea style="background-color:black" id="output" class="form-control form-control-lg w-100" rows="11" readonly></textarea>
+
                         </div>
                     </div>
                 </div>
             </div>
             <!-- Sales Chart End -->
-
-
             <!-- Recent Sales Start -->
             <div class="container-fluid pt-4 px-4">
                 <div class="bg-secondary text-center rounded p-4">
                     <div class="d-flex align-items-center justify-content-between mb-4">
                         <h6 class="mb-0">Error List</h6>
-                       
+
                     </div>
-                    <textarea id="error"class="form-control form-control-lg w-100" rows="4" ></textarea>
-         
+                    <textarea style="background-color:black" id="error" class="form-control form-control-lg w-100" rows="4" readonly></textarea>
+
                 </div>
             </div>
-          
+
         </div>
-      
+
         <a href="#" class="btn btn-lg btn-primary btn-lg-square back-to-top"><i class="bi bi-arrow-up"></i></a>
     </div>
 
@@ -130,30 +127,33 @@
     <script src="~/assets/js/main.js"></script>
 
     <script>
-       
-        function Run(){
+
+        function Run() {
             console.log("source");
 
             var source = document.getElementById("sourcecode").value;
             console.log(source);
 
             $.ajax(
-           
+
                 {
                     url: '/Home/Source',
-                    type:"post",
-                    data: {source : source},
+                    type: "post",
+                    data: { source: source },
 
-                    success: function(res)
-                    {
+                    success: function (res) {
+                        document.getElementById("error").value = '';
+                        document.getElementById("error").value = JSON.stringify(res.tree);
                         document.getElementById("output").value = '';
-                        document.getElementById("output").value = JSON.stringify(res.tree);
+
+                        document.getElementById("output").value = JSON.stringify(res.lex);
+       
                     },
 
-                    error: function (res){
+                    error: function (res) {
                         console.log(res);
                     }
-                    
+
                 }
             );
 

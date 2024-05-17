@@ -8,6 +8,7 @@ namespace SAC9.Lexer
 
         public static List<Lexeme> scan(string input)
         {
+            input += ' ';
             int countLine = 0;
             int countColumn = 0;
             List<Lexeme> result = new List<Lexeme>();
@@ -58,7 +59,7 @@ namespace SAC9.Lexer
                     });
                     continue;
                 }
-                if (cur == ';')
+                if (cur == ';'||cur == '؛')
                 {
                     result.Add(new Lexeme()
                     {
@@ -68,7 +69,7 @@ namespace SAC9.Lexer
                         column = st
                     });
                 }
-                if (cur == ',')
+                if (cur == ','||cur == '،')
                 {
                     result.Add(new Lexeme()
                     {

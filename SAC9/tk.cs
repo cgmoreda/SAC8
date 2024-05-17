@@ -1,6 +1,4 @@
-﻿
-
-using SAC9.Parser;
+﻿using SAC9.Parser;
 using SAC9.Lexer;
 
 namespace SAC9
@@ -9,13 +7,30 @@ namespace SAC9
         public Node tree(string source);
     }
 
-    public class tk 
+    public class Tk 
     {
-        public Node tree(string source)
+        public string tree(string source)
         {
-            Parser.Parser.lexemes =  Lexer.Lexer.scan(source);
-            return Parser.Parser.Parse().node;
+           
+            Parser.Parser parser = new Parser.Parser(Lexer.Lexer.scan(source));
+            var res= parser.Parse();
+            Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(res));
+            return res.error;
+
+        }
+
+        public List<Lexeme> lex(string source)
+        {
+
+            Parser.Parser parser = new Parser.Parser(Lexer.Lexer.scan(source));
+            var res = Lexer.Lexer.scan(source);
+            return res.ToList();
+
         }
         
+        public static void main(string[] args)
+        {
+
+        }
     }
 }
